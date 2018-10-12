@@ -62,8 +62,8 @@ elif(args.dataset == 'cifar100'):
     testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=False, transform=transform_test)
     num_classes = 100
 
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+testloader = torch.utils.data.DataLoader(testset, batch_size=16, shuffle=False, num_workers=4, pin_memory=True)
 
 # Return network & file name
 def getNetwork(args):
@@ -147,7 +147,7 @@ def train(epoch):
     train_loss = 0
     correct = 0
     total = 0
-    optimizer = optim.SGD(net.parameters(), lr=cf.learning_rate(args.lr, epoch), momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.SGD(net.parameters(), lr=cf.learning_rate(args.lr, epoch), momentum=0.9, weight_decay=5e-4, nesterov=True)
 
     print('\n=> Training Epoch #%d, LR=%.4f' %(epoch, cf.learning_rate(args.lr, epoch)))
     for batch_idx, (inputs, targets) in enumerate(trainloader):
@@ -192,21 +192,19 @@ def test(epoch):
     # Save checkpoint when best model
     acc = 100.*correct/total
     print("\n| Validation Epoch #%d\t\t\tLoss: %.4f Acc@1: %.2f%%" %(epoch, loss.data[0], acc))
-
-    if acc > best_acc:
-        print('| Saving Best model...\t\t\tTop1 = %.2f%%' %(acc))
-        state = {
-                'net':net.module if use_cuda else net,
-                'acc':acc,
-                'epoch':epoch,
-        }
-        if not os.path.isdir('checkpoint'):
-            os.mkdir('checkpoint')
-        save_point = './checkpoint/'+args.dataset+os.sep
-        if not os.path.isdir(save_point):
-            os.mkdir(save_point)
-        torch.save(state, save_point+file_name+'.t7')
-        best_acc = acc
+    print('| Saving model...\t\t\tTop1 = %.2f%%' %(acc))
+    state = {
+            'net':net.module if use_cuda else net,
+            'acc':acc,
+            'epoch':epoch,
+    }
+    if not os.path.isdir('checkpoint'):
+        os.mkdir('checkpoint')
+    save_point = './checkpoint/'+args.dataset+os.sep
+    if not os.path.isdir(save_point):
+        os.mkdir(save_point)
+    torch.save(state, save_point+file_name+'.t7')
+    best_acc = acc
 
 print('\n[Phase 3] : Training model')
 print('| Training Epochs = ' + str(num_epochs))
